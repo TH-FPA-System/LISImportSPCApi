@@ -13,5 +13,6 @@
         // Optional fields for new table
         public string? Part { get; set; }
         public string? Serial { get; set; }
+        public string? StoreLocation { get; set; } // New field for store_location column
     }
 }

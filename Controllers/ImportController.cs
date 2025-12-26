@@ -46,46 +46,29 @@ namespace LISImportSPCApi.Controllers
                 {
                     var xlRow = sheet.Row(row);
 
-                    // 1️⃣ Task
-                    int task = 0;
-                    if (!int.TryParse(xlRow.Cell(1).GetString(), out task))
-                        errors.Add($"Row {row}: Invalid Task value '{xlRow.Cell(1).GetString()}'");
-
-                    // 2️⃣ TaskName
+                    // Parse Excel columns
+                    int task = int.TryParse(xlRow.Cell(1).GetString(), out var t) ? t : 0;
                     string taskName = xlRow.Cell(2).GetString() ?? "";
-
-                    // 3️⃣ TestPart
                     string testPart = xlRow.Cell(3).GetString() ?? "";
-                    if (string.IsNullOrWhiteSpace(testPart))
-                        errors.Add($"Row {row}: TestPart is empty");
-
-                    // 4️⃣ TestPartDesc
                     string testPartDesc = xlRow.Cell(4).GetString() ?? "";
-
-                    // 5️⃣ Value
-                    double value = 0;
-                    if (!double.TryParse(xlRow.Cell(5).GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out value))
-                        errors.Add($"Row {row}: Invalid Value '{xlRow.Cell(5).GetString()}'");
-
-                    // 6️⃣ Unit
+                    double value = double.TryParse(xlRow.Cell(5).GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
                     string unit = xlRow.Cell(6).GetString() ?? "";
+                    string dateCell = xlRow.Cell(7).GetString();
+                    string part = xlRow.Cell(8).GetString() ?? "";
+                    string serial = xlRow.Cell(9).GetString() ?? "";
+                    string storeLocation = xlRow.Cell(10).GetString() ?? "";
 
-                    // 7️⃣ TestDateTime
+                    // Validate
+                    if (task == 0) errors.Add($"Row {row}: Invalid Task");
+                    if (string.IsNullOrWhiteSpace(testPart)) errors.Add($"Row {row}: TestPart empty");
+
                     DateTime testDateTime;
-                    var dateCell = xlRow.Cell(7).GetString();
                     if (!DateTime.TryParseExact(dateCell, "dd/MM/yyyy H:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out testDateTime))
                     {
                         if (!DateTime.TryParse(dateCell, out testDateTime))
                             errors.Add($"Row {row}: Invalid date format '{dateCell}'");
                     }
 
-                    // 8️⃣ Part
-                    string part = xlRow.Cell(8).GetString() ?? "";
-
-                    // 9️⃣ Serial
-                    string serial = xlRow.Cell(9).GetString() ?? "";
-
-                    // Only add row if no critical errors
                     if (!errors.Any(e => e.StartsWith($"Row {row}:")))
                     {
                         rows.Add(new RawExcelRowDto
@@ -98,7 +81,8 @@ namespace LISImportSPCApi.Controllers
                             Unit = unit,
                             TestDateTime = testDateTime,
                             Part = part,
-                            Serial = serial
+                            Serial = serial,
+                            StoreLocation = storeLocation
                         });
                     }
                 }
@@ -111,7 +95,7 @@ namespace LISImportSPCApi.Controllers
                 return BadRequest($"Error reading Excel file: {ex.Message}");
             }
 
-            // 2️⃣ Insert into DB with duplicate check
+            // 2️⃣ Insert into DB
             var previewList = new List<dynamic>();
             int insertedCount = 0;
             int duplicateCount = 0;
@@ -124,12 +108,12 @@ namespace LISImportSPCApi.Controllers
 
                 foreach (var r in rows)
                 {
-                    // Duplicate check
+                    // Duplicate check: task + test_part + date_tested
                     var checkCmd = new SqlCommand(@"
-                        SELECT TOP 1 test_result_id
-                        FROM test_result_clean
-                        WHERE task=@task AND test_part=@test_part AND date_tested=@date_tested
-                    ", conn, tran);
+                SELECT TOP 1 test_result_id
+                FROM test_result_clean
+                WHERE task=@task AND test_part=@test_part AND date_tested=@date_tested
+            ", conn, tran);
 
                     checkCmd.Parameters.Add("@task", SqlDbType.Int).Value = r.Task;
                     checkCmd.Parameters.Add("@test_part", SqlDbType.VarChar, 50).Value = r.TestPart;
@@ -138,9 +122,8 @@ namespace LISImportSPCApi.Controllers
                     var existingId = await checkCmd.ExecuteScalarAsync();
                     bool isDuplicate = existingId != null;
 
-                    string statusText = isDuplicate ? "DUPLICATE" : (r.Value < 0 ? "FAIL" : "PASS");
                     string statusChar = r.Value < 0 ? "F" : "P";
-                    string duplicateReason = isDuplicate ? "Duplicate: task + test_part + date_tested" : null;
+                    string statusText = isDuplicate ? "DUPLICATE" : (r.Value < 0 ? "FAIL" : "PASS");
 
                     previewList.Add(new
                     {
@@ -151,36 +134,35 @@ namespace LISImportSPCApi.Controllers
                         Status = statusText
                     });
 
-                    // Insert row
-                    var insertCmd = new SqlCommand(@"
-                        INSERT INTO test_result_clean
-                        (part, serial, task, run_number, test_part, date_tested, 
-                         test_value, test_unit, result_status, result_text, 
-                         test_info1, test_info2, is_duplicate, duplicate_reason)
-                        VALUES
-                        (@part, @serial, @task, 1, @test_part, @date_tested,
-                         @test_value, @test_unit, @status_char, @status_text,
-                         @info1, @info2, @is_duplicate, @duplicate_reason)
-                    ", conn, tran);
+                    if (!isDuplicate)
+                    {
+                        var insertCmd = new SqlCommand(@"
+                    INSERT INTO test_result_clean
+                    (part, serial, task, run_number, test_part, test_value, test_unit, result_status, result_text, test_info1, test_info2, store_location, date_tested)
+                    VALUES
+                    (@part, @serial, @task, DEFAULT, @test_part, @test_value, @test_unit, @status_char, @status_text, @info1, @info2, @store_location, @date_tested)
+                ", conn, tran);
 
-                    insertCmd.Parameters.Add("@part", SqlDbType.VarChar, 50).Value = r.Part;
-                    insertCmd.Parameters.Add("@serial", SqlDbType.VarChar, 50).Value = r.Serial;
-                    insertCmd.Parameters.Add("@task", SqlDbType.Int).Value = r.Task;
-                    insertCmd.Parameters.Add("@test_part", SqlDbType.VarChar, 50).Value = r.TestPart;
-                    insertCmd.Parameters.Add("@date_tested", SqlDbType.DateTime2).Value = r.TestDateTime;
-                    insertCmd.Parameters.Add("@test_value", SqlDbType.Float).Value = r.Value;
-                    insertCmd.Parameters.Add("@test_unit", SqlDbType.VarChar, 16).Value = r.Unit;
-                    insertCmd.Parameters.Add("@status_char", SqlDbType.Char, 1).Value = statusChar;
-                    insertCmd.Parameters.Add("@status_text", SqlDbType.VarChar, 16).Value = statusText;
-                    insertCmd.Parameters.Add("@info1", SqlDbType.VarChar, 50).Value = r.TaskName;
-                    insertCmd.Parameters.Add("@info2", SqlDbType.VarChar, 50).Value = r.TestPartDesc;
-                    insertCmd.Parameters.Add("@is_duplicate", SqlDbType.Bit).Value = isDuplicate;
-                    insertCmd.Parameters.Add("@duplicate_reason", SqlDbType.VarChar, 100).Value = (object?)duplicateReason ?? DBNull.Value;
+                        insertCmd.Parameters.Add("@part", SqlDbType.VarChar, 50).Value = r.Part;
+                        insertCmd.Parameters.Add("@serial", SqlDbType.VarChar, 50).Value = r.Serial;
+                        insertCmd.Parameters.Add("@task", SqlDbType.Int).Value = r.Task;
+                        insertCmd.Parameters.Add("@test_part", SqlDbType.VarChar, 50).Value = r.TestPart;
+                        insertCmd.Parameters.Add("@test_value", SqlDbType.Float).Value = r.Value;
+                        insertCmd.Parameters.Add("@test_unit", SqlDbType.VarChar, 16).Value = r.Unit;
+                        insertCmd.Parameters.Add("@status_char", SqlDbType.Char, 1).Value = statusChar;
+                        insertCmd.Parameters.Add("@status_text", SqlDbType.VarChar, 16).Value = statusText;
+                        insertCmd.Parameters.Add("@info1", SqlDbType.VarChar, 50).Value = r.TaskName;
+                        insertCmd.Parameters.Add("@info2", SqlDbType.VarChar, 200).Value = r.TestPartDesc;
+                        insertCmd.Parameters.Add("@store_location", SqlDbType.VarChar, 50).Value = string.IsNullOrEmpty(r.StoreLocation) ? DBNull.Value : r.StoreLocation;
+                        insertCmd.Parameters.Add("@date_tested", SqlDbType.DateTime2).Value = r.TestDateTime;
 
-                    await insertCmd.ExecuteNonQueryAsync();
-
-                    if (isDuplicate) duplicateCount++;
-                    else insertedCount++;
+                        await insertCmd.ExecuteNonQueryAsync();
+                        insertedCount++;
+                    }
+                    else
+                    {
+                        duplicateCount++;
+                    }
                 }
 
                 tran.Commit();
@@ -197,5 +179,6 @@ namespace LISImportSPCApi.Controllers
                 Preview = previewList
             });
         }
+
     }
 }
