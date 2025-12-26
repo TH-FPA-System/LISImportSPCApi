@@ -1,0 +1,84 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIS SPC Excel Import</title>
+
+    <!-- Local CSS -->
+    <link href="../css/style.css" rel="stylesheet" />
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header Card -->
+        <div class="card header-card">
+            <h1>LIS SPC Excel Import</h1>
+            <div class="alert alert-info" id="uploadMessage">
+                <i class="fas fa-info-circle"></i>
+                Upload Excel file to import SPC data. Duplicates are automatically detected.
+                <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+            </div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card upload-card">
+            <div id="uploadArea" class="upload-area">
+                <i class="fas fa-file-excel fa-3x"></i>
+                <p>Drag & drop Excel file here, or click to select</p>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;">
+            </div>
+            <button id="uploadBtn" disabled class="btn">Upload</button>
+            <div class="progress-container">
+                <div id="uploadProgress" class="progress-bar"></div>
+            </div>
+            <div id="feedback" class="feedback"></div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="card table-card">
+            <h2>Preview Data</h2>
+            <div class="table-container">
+                <table id="resultTable">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Test Part</th>
+                            <th>Test Date</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Duplicates Table -->
+        <div class="card duplicates-card" id="duplicatesCard" style="display:none;">
+            <h2>Duplicate Rows Detected</h2>
+            <button id="downloadDuplicatesBtn" class="btn">Download Duplicates</button>
+            <div class="table-container">
+                <table id="duplicatesTable">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Test Part</th>
+                            <th>Test Date</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JS -->
+    <script src="../js/script.js"></script>
+</body>
+</html>

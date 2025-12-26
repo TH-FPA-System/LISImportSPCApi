@@ -1,0 +1,40 @@
+﻿@{
+    Layout = null;
+    ViewBag.Title = "LIS Excel Import";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewBag.Title</title>
+    <link rel="stylesheet" href="~/css/style.css" />
+</head>
+<body>
+    <div class="container">
+        <h1>LIS Excel Import</h1>
+
+        <div id="uploadArea" class="upload-area">
+            <p>Drag & drop Excel file here, or click to select</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls" />
+        </div>
+
+        <button id="uploadBtn" disabled>Upload</button>
+        <div id="feedback" class="feedback"></div>
+
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Test Part</th>
+                    <th>Test Date</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script src="~/js/script.js"></script>
+</body>
+</html>

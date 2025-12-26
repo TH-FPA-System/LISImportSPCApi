@@ -1,0 +1,6 @@
+@LISImportSPCApi_HostAddress = http://localhost:5052
+
+GET {{LISImportSPCApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
