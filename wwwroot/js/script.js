@@ -48,7 +48,15 @@ uploadBtn.addEventListener("click", async () => {
     uploadProgress.style.width = "0%";
 
     try {
-        const res = await fetch("/api/import/excel", { method: "POST", body: formData });
+        const API_BASE = getApiBase();
+
+        const res = await fetch(`${API_BASE}/api/import/excel`, {
+            method: "POST",
+            body: formData
+        });
+
+
+
         const text = await res.text();
 
         if (!res.ok) return showAlert("Upload failed: " + text, "error");
@@ -145,4 +153,16 @@ function showAlert(message, type = "info") {
     const alertDiv = feedback.querySelector(".alert");
     setTimeout(() => { if (alertDiv) alertDiv.style.opacity = "0"; }, 4000);
     setTimeout(() => { if (alertDiv) alertDiv.remove(); }, 4500);
+}
+function getApiBase() {
+    const path = location.pathname.split("/").filter(Boolean);
+
+    // Known ASP.NET Core virtual directory names (extend if needed)
+    const knownApps = ["LISImportSPCApi"];
+
+    if (path.length && knownApps.includes(path[0])) {
+        return "/" + path[0];
+    }
+
+    return "";
 }
