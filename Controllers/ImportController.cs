@@ -48,15 +48,16 @@ namespace LISImportSPCApi.Controllers
 
                     // Parse Excel columns
                     int task = int.TryParse(xlRow.Cell(1).GetString(), out var t) ? t : 0;
-                    string taskName = xlRow.Cell(2).GetString() ?? "";
-                    string testPart = xlRow.Cell(3).GetString() ?? "";
-                    string testPartDesc = xlRow.Cell(4).GetString() ?? "";
-                    double value = double.TryParse(xlRow.Cell(5).GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
-                    string unit = xlRow.Cell(6).GetString() ?? "";
-                    string dateCell = xlRow.Cell(7).GetString();
-                    string part = xlRow.Cell(8).GetString() ?? "";
-                    string serial = xlRow.Cell(9).GetString() ?? "";
+                    string part = xlRow.Cell(2).GetString() ?? "";
+                    string serial = xlRow.Cell(3).GetString() ?? "";
+                    string taskName = xlRow.Cell(4).GetString() ?? "";
+                    string testPart = xlRow.Cell(5).GetString() ?? "";
+                    string testPartDesc = xlRow.Cell(6).GetString() ?? "";
+                    double value = double.TryParse(xlRow.Cell(7).GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+                    string unit = xlRow.Cell(8).GetString() ?? "";
+                    string dateCell = xlRow.Cell(9).GetString();                 
                     string storeLocation = xlRow.Cell(10).GetString() ?? "";
+                    string created_by = xlRow.Cell(11).GetString() ?? "";
 
                     // Validate
                     if (task == 0) errors.Add($"Row {row}: Invalid Task");
@@ -82,7 +83,8 @@ namespace LISImportSPCApi.Controllers
                             TestDateTime = testDateTime,
                             Part = part,
                             Serial = serial,
-                            StoreLocation = storeLocation
+                            StoreLocation = storeLocation,
+                            Created_by = created_by
                         });
                     }
                 }
@@ -123,8 +125,11 @@ namespace LISImportSPCApi.Controllers
                     bool isDuplicate = existingId != null;
 
                     string statusChar = r.Value < 0 ? "F" : "P";
+                    //FORCE NOCHECK DUPLICATE
+                    isDuplicate = false;
                     string statusText = isDuplicate ? "DUPLICATE" : (r.Value < 0 ? "FAIL" : "PASS");
 
+                   
                     previewList.Add(new
                     {
                         Task = r.Task,
@@ -138,9 +143,9 @@ namespace LISImportSPCApi.Controllers
                     {
                         var insertCmd = new SqlCommand(@"
                     INSERT INTO test_result_clean
-                    (part, serial, task, run_number, test_part, test_value, test_unit, result_status, result_text, test_info1, test_info2, store_location, date_tested)
+                    (part, serial, task, run_number, test_part, test_value, test_unit, result_status, result_text, test_info1, test_info2, store_location, date_tested,created_by)
                     VALUES
-                    (@part, @serial, @task, DEFAULT, @test_part, @test_value, @test_unit, @status_char, @status_text, @info1, @info2, @store_location, @date_tested)
+                    (@part, @serial, @task, DEFAULT, @test_part, @test_value, @test_unit, @status_char, @status_text, @info1, @info2, @store_location, @date_tested, @created_by)
                 ", conn, tran);
 
                         insertCmd.Parameters.Add("@part", SqlDbType.VarChar, 50).Value = r.Part;
@@ -155,6 +160,7 @@ namespace LISImportSPCApi.Controllers
                         insertCmd.Parameters.Add("@info2", SqlDbType.VarChar, 200).Value = r.TestPartDesc;
                         insertCmd.Parameters.Add("@store_location", SqlDbType.VarChar, 50).Value = string.IsNullOrEmpty(r.StoreLocation) ? DBNull.Value : r.StoreLocation;
                         insertCmd.Parameters.Add("@date_tested", SqlDbType.DateTime2).Value = r.TestDateTime;
+                        insertCmd.Parameters.Add("@created_by", SqlDbType.VarChar, 50).Value = r.Created_by;
 
                         await insertCmd.ExecuteNonQueryAsync();
                         insertedCount++;
